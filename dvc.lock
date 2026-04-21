@@ -1,0 +1,70 @@
+schema: '2.0'
+stages:
+  parse:
+    cmd: python src/parse_corpus.py
+    deps:
+    - path: data/raw/ru-fr_interference/2/metadata_RUFR.csv
+      hash: md5
+      md5: c1436dcbae5e46962e5db6c7b26f0043
+      size: 580
+    - path: data/raw/ru-fr_interference/2/wav_et_textgrids/FRcorp_textgrids_only
+      hash: md5
+      md5: f740bda64fa177d7c2cfbb84602feb88.dir
+      size: 738308394
+      nfiles: 5928
+    - path: src/parse_corpus.py
+      hash: md5
+      md5: cee954805ef04ef04dea90fc079b2c71
+      size: 4747
+    params:
+      params.yaml:
+        corpus:
+          dir: 
+            data/raw/ru-fr_interference/2/wav_et_textgrids/FRcorp_textgrids_only
+          metadata: data/raw/ru-fr_interference/2/metadata_RUFR.csv
+        parse:
+          min_speakers: 2
+          min_recordings: 2
+          noise_tokens:
+          - sil
+          - sp
+          - spn
+          - unk
+          - <unk>
+          - ''
+    outs:
+    - path: data/parsed/usable_words.json
+      hash: md5
+      md5: d3415916acccbc02e94285a5c7560357
+      size: 282
+    - path: data/parsed/words.csv
+      hash: md5
+      md5: ac0db1d0eeae34524aec9a2bbd48e6da
+      size: 1191138
+  extract:
+    cmd: python src/extract_embeddings.py
+    deps:
+    - path: data/parsed/usable_words.json
+      hash: md5
+      md5: d3415916acccbc02e94285a5c7560357
+      size: 282
+    - path: data/parsed/words.csv
+      hash: md5
+      md5: ac0db1d0eeae34524aec9a2bbd48e6da
+      size: 1191138
+    - path: src/extract_embeddings.py
+      hash: md5
+      md5: 1027159d83c0cfb0754f3a6b30ef6fcb
+      size: 3418
+    params:
+      params.yaml:
+        extract:
+          model: facebook/wav2vec2-base
+          target_sr: 16000
+          min_frames: 400
+          pooling: mean
+    outs:
+    - path: data/features/word_embeddings.parquet
+      hash: md5
+      md5: b94fa04526fc89b07fbbc06fd3be98b5
+      size: 30025814

@@ -2,3 +2,15 @@
 .pixi/*
 !.pixi/config.toml
 data/raw/ru-fr_interference
+
+# data — tracked by DVC, not git
+data/
+
+# DVC cache
+.dvc/cache/
+.dvc/tmp/
+
+# Python
+__pycache__/
+*.pyc
+.env

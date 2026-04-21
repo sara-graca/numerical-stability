@@ -1,0 +1,24 @@
+stages:
+  parse:
+    cmd: python src/parse_corpus.py
+    deps:
+      - src/parse_corpus.py
+      - ${corpus.dir}
+      - ${corpus.metadata}
+    params:
+      - corpus
+      - parse
+    outs:
+      - data/parsed/words.csv
+      - data/parsed/usable_words.json
+
+  extract:
+    cmd: python src/extract_embeddings.py
+    deps:
+      - src/extract_embeddings.py
+      - data/parsed/words.csv
+      - data/parsed/usable_words.json
+    params:
+      - extract
+    outs:
+      - data/features/word_embeddings.parquet

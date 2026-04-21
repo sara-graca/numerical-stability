@@ -3,11 +3,20 @@ import re
 import tgt
 import chardet
 import pandas as pd
-from collections import defaultdict
+import json
+import yaml
 
-CORPUS_DIR    = os.path.join("data", "raw", "ru-fr_interference", "2", "wav_et_textgrids", "FRcorp_textgrids_only")
-METADATA_PATH = os.path.join("data", "raw", "ru-fr_interference", "2", "metadata_RUFR.csv")
-OUTPUT_PATH   = os.path.join("data", "parsed", "words.csv")
+OUTPUT_PATH       = os.path.join("data", "parsed", "words.csv")
+USABLE_WORDS_PATH = os.path.join("data", "parsed", "usable_words.json")
+
+with open("params.yaml") as f:
+    params = yaml.safe_load(f)
+
+CORPUS_DIR    = params["corpus"]["dir"]
+METADATA_PATH = params["corpus"]["metadata"]
+NOISE_TOKENS  = set(params["parse"]["noise_tokens"])
+MIN_SPEAKERS  = params["parse"]["min_speakers"]
+MIN_RECORDINGS = params["parse"]["min_recordings"]
 
 # metadata
 
@@ -25,16 +34,13 @@ def read_txt(path: str) -> str:
 
 def clean_word(w: str) -> str:
     w = w.strip().lower()
-    # keep only letters and apostrophes (drops digits, underscores, punctuation)
     w = re.sub(r"[^a-zàâäéèêëîïôùûüçœæ']", "", w)
     return w
 
-# parse
-rows: list[dict] = []
-# key: (spk_id, sent_id) → count of recordings seen so far
-repetition_counter: dict[tuple[str, str], int] = defaultdict(int)
 
-NOISE_TOKENS = {"sil", "sp", "spn", "unk", "<unk>", ""}
+# parse
+
+rows: list[dict] = []
 
 for speaker_folder in sorted(os.listdir(CORPUS_DIR)):
     speaker_path = os.path.join(CORPUS_DIR, speaker_folder)
@@ -47,8 +53,8 @@ for speaker_folder in sorted(os.listdir(CORPUS_DIR)):
         continue
 
     spk_original = speaker_info[spk_id]["spk"]
-    l1 = speaker_info[spk_id]["L1"]
-    gender = speaker_info[spk_id]["Gender"]
+    l1           = speaker_info[spk_id]["L1"]
+    gender       = speaker_info[spk_id]["Gender"]
 
     for filename in sorted(os.listdir(speaker_path)):
         if not filename.endswith(".TextGrid"):
@@ -63,25 +69,17 @@ for speaker_folder in sorted(os.listdir(CORPUS_DIR)):
             print(f"[WARN] could not parse filename '{filename}', skipping")
             continue
 
-        # Use sent_id from the filename as the stable key (never missing)
         sent_id  = match.group("sent_id").upper()
         tg_path  = os.path.join(speaker_path, filename)
         wav_path = tg_path.replace(".TextGrid", ".wav")
         txt_path = tg_path.replace(".TextGrid", ".txt")
 
-        # Check wav exists before going further
         if not os.path.isfile(wav_path):
             print(f"[WARN] no wav found for '{tg_path}', skipping")
             continue
 
         sentence_text = read_txt(txt_path)
 
-        # Repetition index: incremented per (speaker, sent_id) pair
-        key = (spk_id, sentence_text)
-        repetition_counter[key] += 1
-        rep_idx = repetition_counter[key]
-
-        # Load TextGrid
         try:
             tg         = tgt.io.read_textgrid(tg_path)
             words_tier = tg.get_tier_by_name("words")
@@ -95,54 +93,54 @@ for speaker_folder in sorted(os.listdir(CORPUS_DIR)):
                 continue
 
             rows.append({
-                "speaker_id":    spk_id,
+                "speaker_id":     spk_id,
                 "speaker_id_raw": spk_original,
-                "l1_status":     l1,
-                "gender":        gender,
-                "sent_id":       sent_id,
-                "sentence_text": sentence_text,
-                "repetition":    rep_idx,
-                "word":          word,
-                "onset":         interval.start_time,
-                "offset":        interval.end_time,
-                "duration_ms":   round((interval.end_time - interval.start_time) * 1000, 4),
-                "wav_path":      wav_path,
+                "l1_status":      l1,
+                "gender":         gender,
+                "sent_id":        sent_id,
+                "sentence_text":  sentence_text,
+                "word":           word,
+                "onset":          interval.start_time,
+                "offset":         interval.end_time,
+                "duration_ms":    round((interval.end_time - interval.start_time) * 1000, 4),
+                "wav_path":       wav_path,
             })
 
 
-# build df and save
+# build dataframe
 
 df = pd.DataFrame(rows)
 
 if df.empty:
-    raise RuntimeError("No word tokens were extracted. Check CORPUS_DIR and metadata paths.")
-
-# Numeric sentence index (stable, sorted)
-sent_ids_sorted = sorted(df["sent_id"].unique())
-df["sentence_index"] = df["sent_id"].map({s: i + 1 for i, s in enumerate(sent_ids_sorted)})
+    raise RuntimeError("No word tokens extracted. Check CORPUS_DIR and metadata paths.")
 
 os.makedirs(os.path.dirname(OUTPUT_PATH), exist_ok=True)
 df.to_csv(OUTPUT_PATH, index=False)
 
+# usable words: ≥2 speakers AND ≥2 recordings per speaker
+# every row is one distinct recording of a word by a speaker,
+# so we just count rows per (word, speaker_id).
+
+recordings_per_speaker = df.groupby(["word", "speaker_id"]).size()
+
+words_with_enough = (
+    recordings_per_speaker[recordings_per_speaker >= MIN_RECORDINGS]
+    .groupby("word")
+    .size()
+)
+word_speakers = df.groupby("word")["speaker_id"].nunique()
+
+usable_mask  = (words_with_enough >= MIN_SPEAKERS) & (word_speakers >= MIN_SPEAKERS)
+usable_words = sorted(usable_mask[usable_mask].index.tolist())
+
+with open(USABLE_WORDS_PATH, "w", encoding="utf-8") as f:
+    json.dump(usable_words, f, ensure_ascii=False, indent=2)
+
 # summary
 
 print(f"Done: {len(df)} word tokens → {OUTPUT_PATH}")
-print(f"  Speakers  : {df['speaker_id'].nunique()}")
-print(f"  Unique words: {df['word'].nunique()}")
-print(f"  Unique sentences : {df['sentence_text'].nunique()}")
-print(
-    f"  Avg repetitions per speaker-sentence: "
-    f"{df.groupby(['speaker_id', 'sentence_text'])['repetition'].max().mean():.2f}"
-)
-
-# Words usable for distance analysis (≥2 speakers, ≥2 reps per speaker)
-
-word_speakers = df.groupby("word")["speaker_id"].nunique()
-
-word_counts = df["word"].value_counts()
-
-usable_words = list(word_speakers[word_speakers >= 2].index)
-
+print(f"  Speakers        : {df['speaker_id'].nunique()}")
+print(f"  Unique words    : {df['word'].nunique()}")
+print(f"  Unique sentences: {df['sentence_text'].nunique()}")
 print(f"\nWords usable for analysis: {len(usable_words)}")
-
 print(usable_words)
