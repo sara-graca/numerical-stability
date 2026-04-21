@@ -16,6 +16,7 @@ matplotlib = "*"
 pysoundfile = ">=0.13.1,<0.14"
 pyarrow = ">=23.0.1,<24"
 dvc = ">=3.67.1,<4"
+tqdm = ">=4.67.3,<5"
 
 [pypi-dependencies]
 torch = "*"

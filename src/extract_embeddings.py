@@ -99,7 +99,7 @@ print(f"Extracted {len(embeddings)} embeddings, skipped {skipped} short segments
 # save
 
 out_df     = pd.DataFrame(embeddings)
-emb_matrix = np.stack(out_df["embedding"].values)
+emb_matrix = np.stack(out_df["embedding"].values).astype(np.float64) # needed to observe difference between computed distances
 emb_cols   = [f"dim_{i}" for i in range(emb_matrix.shape[1])]
 emb_df     = pd.DataFrame(emb_matrix, columns=emb_cols)
 final_df   = pd.concat([out_df.drop(columns=["embedding"]), emb_df], axis=1)

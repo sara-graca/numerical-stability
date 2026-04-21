@@ -22,3 +22,14 @@ stages:
       - extract
     outs:
       - data/features/word_embeddings.parquet
+
+  distances:
+    cmd: python src/compute_distances.py
+    deps:
+      - src/compute_distances.py
+      - data/features/word_embeddings.parquet
+    params:
+      - distances
+    outs:
+      - data/distances/distances.parquet
+      - data/distances/precision_stats.csv

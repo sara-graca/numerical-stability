@@ -54,8 +54,8 @@ stages:
       size: 1191138
     - path: src/extract_embeddings.py
       hash: md5
-      md5: 1027159d83c0cfb0754f3a6b30ef6fcb
-      size: 3418
+      md5: d164939167cdf9a2ebd63606aa90e65c
+      size: 3495
     params:
       params.yaml:
         extract:
@@ -66,5 +66,33 @@ stages:
     outs:
     - path: data/features/word_embeddings.parquet
       hash: md5
-      md5: b94fa04526fc89b07fbbc06fd3be98b5
-      size: 30025814
+      md5: 6e726caaa05632880a942ad426b2a9f6
+      size: 40878486
+  distances:
+    cmd: python src/compute_distances.py
+    deps:
+    - path: data/features/word_embeddings.parquet
+      hash: md5
+      md5: 6e726caaa05632880a942ad426b2a9f6
+      size: 40878486
+    - path: src/compute_distances.py
+      hash: md5
+      md5: f19c6ebcc35a815186e95a52bb97ff74
+      size: 4913
+    params:
+      params.yaml:
+        distances:
+          precisions:
+          - float64
+          - float32
+          - float16
+          - int8
+    outs:
+    - path: data/distances/distances.parquet
+      hash: md5
+      md5: 49f91dbd712364f0d2be20f6275e1966
+      size: 102949025
+    - path: data/distances/precision_stats.csv
+      hash: md5
+      md5: 1f60c8b599191138bd14d0c6517c5252
+      size: 561
