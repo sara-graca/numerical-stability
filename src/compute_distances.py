@@ -67,6 +67,8 @@ for precision in PRECISIONS:
 
     intra_distances = []
     inter_distances = []
+    word_intra_means = {}
+    word_inter_means = {}
 
     t1 = time.perf_counter()
 
@@ -83,6 +85,12 @@ for precision in PRECISIONS:
 
         intra_distances.extend(distances[same_speaker].tolist())
         inter_distances.extend(distances[~same_speaker].tolist())
+
+        word_intra = distances[same_speaker]
+        word_inter = distances[~same_speaker]
+        if len(word_intra) > 0 and len(word_inter) > 0:
+            word_intra_means[word] = float(np.nanmean(word_intra))
+            word_inter_means[word] = float(np.nanmean(word_inter))
 
         for k in range(len(distances)):
             all_rows.append({
@@ -105,17 +113,24 @@ for precision in PRECISIONS:
     mean_inter = float(np.nanmean(inter_distances)) if inter_distances else np.nan
     ratio = mean_intra / mean_inter if mean_inter else np.nan
 
+    common_words = set(word_intra_means) & set(word_inter_means)
+    ordering_preserved = sum(
+        word_intra_means[w] < word_inter_means[w] for w in common_words
+    )
+    ordering_pct = 100 * ordering_preserved / len(common_words) if common_words else np.nan
+
     stat_rows.append({
-        "precision":         precision,
-        "mean_intra":        mean_intra,
-        "mean_inter":        mean_inter,
-        "intra_inter_ratio": ratio,
-        "n_intra_pairs":     len(intra_distances),
-        "n_inter_pairs":     len(inter_distances),
-        "cast_time_s":       round(t_cast, 4),
-        "dist_time_s":       round(t_dist, 4),
-        "disk_bytes":        disk_bytes,
-        "disk_mb":           round(disk_bytes / 1e6, 3),
+        "precision":              precision,
+        "mean_intra":             mean_intra,
+        "mean_inter":             mean_inter,
+        "intra_inter_ratio":      ratio,
+        "ordering_preserved_pct": round(ordering_pct, 2),
+        "n_intra_pairs":          len(intra_distances),
+        "n_inter_pairs":          len(inter_distances),
+        "cast_time_s":            round(t_cast, 4),
+        "dist_time_s":            round(t_dist, 4),
+        "disk_bytes":             disk_bytes,
+        "disk_mb":                round(disk_bytes / 1e6, 3),
     })
 
     print(f"  mean intra: {mean_intra:.4f}  mean inter: {mean_inter:.4f}  ratio: {ratio:.4f}")
@@ -134,8 +149,3 @@ print(f"\nSaved distances: {OUTPUT_FILE}")
 print(f"Saved statistics: {STATS_FILE}")
 pd.set_option("display.float_format", lambda x: f"{x:.10f}")
 print(stats_df.to_string(index=False))
-
-df = pd.read_parquet("data/distances/distances.parquet")
-f64 = df[df["precision"] == "float64"]["distance"].values
-f32 = df[df["precision"] == "float32"]["distance"].values
-print(np.max(np.abs(f64 - f32)))

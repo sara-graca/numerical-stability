@@ -33,3 +33,16 @@ stages:
     outs:
       - data/distances/distances.parquet
       - data/distances/precision_stats.csv
+
+  visualise:
+    cmd: python src/visualise.py
+    deps:
+      - src/visualise.py
+      - data/distances/distances.parquet
+      - data/distances/precision_stats.csv
+    params:
+      - distances
+    outs:
+      - data/figures/kde_distances_by_precision.png
+      - data/figures/mean_distances_by_precision.png
+      - data/figures/deviation_from_float64.png
