@@ -30,9 +30,9 @@ def cast_embeddings(matrix: np.ndarray, precision: str) -> np.ndarray:
     if precision == "float64":
         return matrix.astype(np.float64)
     elif precision == "float32":
-        return matrix.astype(np.float32).astype(np.float64)
+        return matrix.astype(np.float32)
     elif precision == "float16":
-        return matrix.astype(np.float16).astype(np.float64)
+        return matrix.astype(np.float16)
     elif precision == "int8":
         return quantise_int8(matrix.astype(np.float64))
     else:
@@ -40,15 +40,12 @@ def cast_embeddings(matrix: np.ndarray, precision: str) -> np.ndarray:
 
 
 def pairwise_cosine_distances(vecs: np.ndarray) -> np.ndarray:
-    """Vectorised pairwise cosine distances for a group of vectors. Returns upper-triangle values."""
     norms  = np.linalg.norm(vecs, axis=1, keepdims=True)
     normed = vecs / np.where(norms == 0, 1.0, norms)
-    # full similarity matrix, then convert to distance
     sim    = normed @ normed.T
     dist   = 1.0 - sim
     i_idx, j_idx = np.triu_indices(len(vecs), k=1)
     return dist[i_idx, j_idx], i_idx, j_idx
-
 
 # load data
 
@@ -74,16 +71,15 @@ for precision in PRECISIONS:
     t1 = time.perf_counter()
 
     for word, word_df in tqdm(df.groupby("word"), desc=precision, unit="word"):
-        word_df   = word_df.reset_index(drop=True)
-        speakers  = word_df["speaker_id"].values
-        sent_ids  = word_df["sent_id"].values
+        speakers = word_df["speaker_id"].values
+        sent_ids = word_df["sent_id"].values
         positions = df.index.get_indexer(word_df.index)
-        vecs      = matrix[positions]
+        vecs = matrix[positions]
 
         distances, i_idx, j_idx = pairwise_cosine_distances(vecs)
 
         same_speaker = speakers[i_idx] == speakers[j_idx]
-        pair_types   = np.where(same_speaker, "intra", "inter")
+        pair_types = np.where(same_speaker, "intra", "inter")
 
         intra_distances.extend(distances[same_speaker].tolist())
         inter_distances.extend(distances[~same_speaker].tolist())
@@ -103,11 +99,11 @@ for precision in PRECISIONS:
     t_dist = time.perf_counter() - t1
 
     bytes_per_val = {"float64": 8, "float32": 4, "float16": 2, "int8": 1}
-    disk_bytes    = len(df) * len(emb_cols) * bytes_per_val[precision]
+    disk_bytes = len(df) * len(emb_cols) * bytes_per_val[precision]
 
     mean_intra = float(np.nanmean(intra_distances)) if intra_distances else np.nan
     mean_inter = float(np.nanmean(inter_distances)) if inter_distances else np.nan
-    ratio      = mean_intra / mean_inter if mean_inter else np.nan
+    ratio = mean_intra / mean_inter if mean_inter else np.nan
 
     stat_rows.append({
         "precision":         precision,
@@ -134,6 +130,12 @@ pd.DataFrame(all_rows).to_parquet(OUTPUT_FILE, index=False)
 stats_df = pd.DataFrame(stat_rows)
 stats_df.to_csv(STATS_FILE, index=False)
 
-print(f"\nSaved distances → {OUTPUT_FILE}")
-print(f"Saved stats     → {STATS_FILE}")
+print(f"\nSaved distances: {OUTPUT_FILE}")
+print(f"Saved statistics: {STATS_FILE}")
+pd.set_option("display.float_format", lambda x: f"{x:.10f}")
 print(stats_df.to_string(index=False))
+
+df = pd.read_parquet("data/distances/distances.parquet")
+f64 = df[df["precision"] == "float64"]["distance"].values
+f32 = df[df["precision"] == "float32"]["distance"].values
+print(np.max(np.abs(f64 - f32)))
