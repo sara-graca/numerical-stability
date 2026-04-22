@@ -23,11 +23,4 @@ parse → extract → distances → visualise
 
 ## Configuration
 
-All parameters are in `params.yaml`:
-
-  min_frames: 400
-  pooling: mean
-
-distances:
-  precisions: ["float64", "float32", "float16", "int8"]
-```
+All parameters are in `params.yaml`.
