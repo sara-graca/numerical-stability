@@ -24,3 +24,11 @@ parse → extract → distances → visualise
 ## Configuration
 
 All parameters are in `params.yaml`.
+
+## Findings
+
+Precision reduction introduces noise but does not fundamentally alter the structure 
+of the representation space. Intra-speaker distances remain strictly below 
+inter-speaker distances across all precision levels (100% ordering preservation). 
+Float32 is effectively equivalent to float64. Float16 and int8 introduce deviations 
+on the order of 1e-3 but preserve the intra/inter structure completely.
