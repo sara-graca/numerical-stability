@@ -25,19 +25,6 @@ parse → extract → distances → visualise
 
 All parameters are in `params.yaml`:
 
-```yaml
-corpus:
-  dir: data/raw/ru-fr_interference/2/wav_et_textgrids/FRcorp_textgrids_only
-  metadata: data/raw/ru-fr_interference/2/metadata_RUFR.csv
-
-parse:
-  min_speakers: 2
-  min_recordings: 2
-  noise_tokens: ["sil", "sp", "spn", "unk", "<unk>", ""]
-
-extract:
-  model: facebook/wav2vec2-base
-  target_sr: 16000
   min_frames: 400
   pooling: mean
 
